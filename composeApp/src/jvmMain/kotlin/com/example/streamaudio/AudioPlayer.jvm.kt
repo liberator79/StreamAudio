@@ -7,42 +7,32 @@ import javax.sound.sampled.SourceDataLine
 
 actual class AudioPlayer actual constructor() {
 
-    private var sourceLine: SourceDataLine? = null
-    private var isPlaying = false
+    private var line: SourceDataLine? = null
 
-    actual fun startAudio() {
-        if (isPlaying) return
+    actual val outputLatencyMs: Int
+        get() = line?.let { it.bufferSize * 1000 / (StreamConfig.SAMPLE_RATE * StreamConfig.BYTES_PER_FRAME) } ?: 0
 
-        try {
-            val format = AudioFormat(48000f, 16, 2, true, false)
-            val info = DataLine.Info(SourceDataLine::class.java, format)
-
-            if (!AudioSystem.isLineSupported(info)) return
-
-            sourceLine = AudioSystem.getLine(info) as SourceDataLine
-
-            sourceLine?.open(format, 4096)
-            sourceLine?.start()
-            isPlaying = true
-        } catch (e: Exception) {
-            e.printStackTrace()
+    actual fun start() {
+        if (line != null) return
+        val format = AudioFormat(StreamConfig.SAMPLE_RATE.toFloat(), 16, StreamConfig.CHANNELS, true, false)
+        val info = DataLine.Info(SourceDataLine::class.java, format)
+        // 40 ms device buffer: enough to ride out scheduler hiccups without underrun crackle
+        // (the old 4 KB / 21 ms buffer underran constantly), small enough to keep delay low.
+        val bufferBytes = StreamConfig.SAMPLE_RATE * StreamConfig.BYTES_PER_FRAME * 40 / 1000
+        line = (AudioSystem.getLine(info) as SourceDataLine).apply {
+            open(format, bufferBytes)
+            start()
         }
     }
 
-    actual fun playAudio(data: ByteArray, size: Int) {
-        if (!isPlaying) return
-        sourceLine?.write(data, 0, size)
+    actual fun write(data: ByteArray, offset: Int, length: Int) {
+        line?.write(data, offset, length)
     }
 
     actual fun stop() {
-        isPlaying = false
-        try {
-            sourceLine?.drain()
-            sourceLine?.stop()
-            sourceLine?.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        sourceLine = null
+        val l = line ?: return
+        line = null
+        // No drain(): it blocks until the buffer plays out, which made disconnecting sluggish.
+        runCatching { l.stop(); l.flush(); l.close() }
     }
 }
