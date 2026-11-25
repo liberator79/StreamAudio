@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How StreamAudio Works</title>
+<!-- GENERATED from docs/tools/guide.template.html by docs/tools/build-guide.pl. Edit the template, not this file. -->
+<style>
+:root {
+  --bg: #fbf8ff; --surface: #f1eef7; --surface2: #e9e7ef; --text: #1b1b21; --muted: #5c5c66;
+  --primary: #4a5ac9; --tertiary: #00796b; --border: #d6d4de; --code-bg: #ffffff;
+  --c-comment: #6b7280; --c-string: #0f7b45; --c-kw: #a626a4; --c-type: #2f5fbf; --c-num: #b45309; --c-ann: #9a6700;
+  --warn-bg: #fff4d6; --warn-text: #5c4300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121318; --surface: #1c1d23; --surface2: #26272e; --text: #e4e1e9; --muted: #a4a3ad;
+    --primary: #bac3ff; --tertiary: #80d5c7; --border: #34343a; --code-bg: #16171c;
+    --c-comment: #8b8f98; --c-string: #8fd6a4; --c-kw: #d7a6ff; --c-type: #9cc2ff; --c-num: #f5b971; --c-ann: #e5c07b;
+    --warn-bg: #3a3014; --warn-text: #f3dfa4;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121318; --surface: #1c1d23; --surface2: #26272e; --text: #e4e1e9; --muted: #a4a3ad;
+  --primary: #bac3ff; --tertiary: #80d5c7; --border: #34343a; --code-bg: #16171c;
+  --c-comment: #8b8f98; --c-string: #8fd6a4; --c-kw: #d7a6ff; --c-type: #9cc2ff; --c-num: #f5b971; --c-ann: #e5c07b;
+  --warn-bg: #3a3014; --warn-text: #f3dfa4;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--primary); }
+.layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); }
+nav { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 24px 20px; border-right: 1px solid var(--border); background: var(--surface); font-size: 14px; }
+nav h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 20px 0 6px; }
+nav ul { list-style: none; padding: 0; margin: 0; }
+nav li a { display: block; padding: 3px 0; text-decoration: none; color: var(--text); }
+nav li a:hover { color: var(--primary); }
+main { padding: 32px clamp(16px, 4vw, 56px) 80px; max-width: 1100px; }
+header.hero { padding: 8px 0 24px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+header.hero h1 { font-size: clamp(28px, 4vw, 40px); margin: 0 0 8px; }
+header.hero p { color: var(--muted); margin: 0; max-width: 70ch; }
+h2 { margin-top: 48px; font-size: 26px; }
+h3 { font-size: 20px; margin: 0 0 4px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 20px; margin: 16px 0; }
+.note { background: var(--warn-bg); color: var(--warn-text); border-radius: 12px; padding: 12px 16px; margin: 16px 0; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 15px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--surface2); }
+code { font-family: "Cascadia Code", Consolas, ui-monospace, monospace; font-size: .92em; font-variant-ligatures: none; }
+p code, li code, td code { background: var(--surface2); padding: 1px 5px; border-radius: 5px; }
+section.file { margin: 40px 0 56px; padding-top: 8px; border-top: 2px solid var(--border); }
+.path { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+.block { margin: 14px 0 22px; }
+.range { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .03em; margin-bottom: 4px; }
+pre.code { margin: 0; background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 10px 0; overflow-x: auto; font-size: 13px; line-height: 1.55; }
+pre.code code { display: block; min-width: max-content; padding-right: 16px; }
+.ln::before { content: attr(data-n); display: inline-block; width: 3.4em; padding-right: 1em; margin-right: .8em; text-align: right; color: var(--muted); opacity: .6; border-right: 1px solid var(--border); user-select: none; }
+.explain { background: var(--surface); border-left: 4px solid var(--primary); border-radius: 0 12px 12px 0; padding: 10px 16px; margin-top: 8px; }
+.explain p { margin: 6px 0; }
+.explain ul { margin: 6px 0; padding-left: 20px; }
+details.imports { margin: 10px 0 16px; }
+details.imports summary { cursor: pointer; color: var(--muted); font-size: 14px; margin-bottom: 6px; }
+.c { color: var(--c-comment); font-style: italic; } .s { color: var(--c-string); } .k { color: var(--c-kw); font-weight: 600; }
+.t { color: var(--c-type); } .n { color: var(--c-num); } .a { color: var(--c-ann); }
+.diagram { width: 100%; height: auto; max-width: 980px; display: block; margin: 8px auto; }
+.diagram .box { fill: var(--surface2); stroke: var(--border); }
+.diagram .boxp { fill: var(--surface2); stroke: var(--primary); stroke-width: 1.5; }
+.diagram .boxt { fill: var(--surface2); stroke: var(--tertiary); stroke-width: 1.5; }
+.diagram text { fill: var(--text); font: 13px system-ui, sans-serif; }
+.diagram .small { fill: var(--muted); font-size: 11px; }
+.diagram .lane { fill: none; stroke: var(--border); stroke-dasharray: 4 4; }
+.diagram .arrow { stroke: var(--primary); stroke-width: 2; fill: none; marker-end: url(#ah); }
+.diagram .arrow2 { stroke: var(--tertiary); stroke-width: 2; fill: none; marker-end: url(#ah2); stroke-dasharray: 5 4; }
+.theme-btn { position: fixed; top: 14px; right: 16px; z-index: 10; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; font-size: 14px; }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+<button class="theme-btn" id="themeBtn" type="button">Theme: auto</button>
+<div class="layout">
+<nav>
+  <h2>Guide</h2>
+  <ul>
+    <li><a href="#overview">1. What StreamAudio does</a></li>
+    <li><a href="#big-picture">2. The big picture</a></li>
+    <li><a href="#format">3. Audio format &amp; packets</a></li>
+    <li><a href="#protocol">4. The network protocol</a></li>
+    <li><a href="#host">5. Host pipeline</a></li>
+    <li><a href="#listener">6. Listener pipeline</a></li>
+    <li><a href="#latency">7. How lag is kept low</a></li>
+    <li><a href="#discovery">8. Finding hosts</a></li>
+    <li><a href="#android">9. Android specifics</a></li>
+    <li><a href="#windows">10. Windows specifics</a></li>
+    <li><a href="#threads">11. Threads at a glance</a></li>
+    <li><a href="#ui">12. UI &amp; dark mode</a></li>
+    <li><a href="#tests">13. Tests</a></li>
+    <li><a href="#walkthrough">14. Code walkthrough</a></li>
+  </ul>
+  <h2>Files</h2>
+  <ul>
+@@TOC@@
+  </ul>
+</nav>
+<main>
+<header class="hero">
+  <h1>How StreamAudio works</h1>
+  <p>A complete explanation of how this app shares audio from Windows or Android to another device over Wi&#8209;Fi, what each technology is for, and a walkthrough of every line of the source code. The code below is the real code, with its real line numbers, so this page can be read without the project open.</p>
+</header>
+
+<h2 id="overview">1. What StreamAudio does</h2>
+<p>StreamAudio lets one device (<b>the host</b>) send whatever it's playing to one or more other devices (<b>listeners</b>) on the same Wi&#8209;Fi network. Hosts can be a Windows PC or an Android&nbsp;10+ phone; listeners can be Android phones or PCs. It is one Kotlin Multiplatform code base built with Compose Multiplatform for the UI.</p>
+<div class="card">
+<b>Technologies used</b>
+<table>
+<tr><th>What</th><th>Used for</th></tr>
+<tr><td>Kotlin Multiplatform (<code>commonMain</code>, <code>androidMain</code>, <code>jvmMain</code>)</td><td>Shared networking, protocol, buffering and UI. Only audio capture/playback and OS integration are per-platform.</td></tr>
+<tr><td>Compose Multiplatform + Material&nbsp;3</td><td>The UI on both Android and Windows, including the light and dark themes.</td></tr>
+<tr><td>UDP (<code>java.net.DatagramSocket</code>)</td><td>Sending audio. UDP never waits to resend lost data, so a late packet can't hold up the ones behind it (TCP would).</td></tr>
+<tr><td>Raw PCM, 48&nbsp;kHz / 16&#8209;bit / stereo</td><td>The audio data itself. No compression, so there is no encoder delay and almost no CPU cost.</td></tr>
+<tr><td>WASAPI loopback (via JNA)</td><td>Capturing everything a Windows PC plays.</td></tr>
+<tr><td>JavaSound</td><td>Speaker output on Windows, and the "Stereo Mix" capture fallback.</td></tr>
+<tr><td>Android <code>MediaProjection</code> + <code>AudioPlaybackCapture</code></td><td>Capturing what other apps play on an Android phone.</td></tr>
+<tr><td>Android <code>AudioTrack</code> (low-latency mode)</td><td>Speaker output on Android.</td></tr>
+<tr><td>Foreground services, wake lock, Wi&#8209;Fi locks</td><td>Keeping Android hosting and listening running with the screen off, without Wi&#8209;Fi power-save lag.</td></tr>
+<tr><td>Kotlin coroutines / <code>StateFlow</code></td><td>Pushing status (live, listeners, delay, level) from the audio threads to the UI.</td></tr>
+<tr><td><code>androidx.lifecycle.ViewModel</code></td><td>Keeping screen state across Android rotation.</td></tr>
+</table>
+</div>
+
+<h2 id="big-picture">2. The big picture</h2>
+<p>Audio flows left to right. Solid arrows are audio; dashed arrows are the small control messages the listener sends back.</p>
+<svg class="diagram" viewBox="0 0 980 360" role="img" aria-label="Data flow from host capture to listener speaker">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--primary)"/></marker>
+    <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--tertiary)"/></marker>
+  </defs>
+  <rect class="lane" x="10" y="20" width="420" height="320" rx="16"/>
+  <text x="26" y="44" font-weight="700">HOST (PC or Android 10+)</text>
+  <rect class="lane" x="550" y="20" width="420" height="320" rx="16"/>
+  <text x="566" y="44" font-weight="700">LISTENER (phone or PC)</text>
+
+  <rect class="boxp" x="30" y="64" width="180" height="64" rx="10"/>
+  <text x="44" y="90">AudioSource</text>
+  <text class="small" x="44" y="108">WASAPI loopback / Stereo Mix</text>
+  <text class="small" x="44" y="122">or AudioPlaybackCapture</text>
+
+  <rect class="boxp" x="30" y="164" width="180" height="64" rx="10"/>
+  <text x="44" y="190">HostEngine</text>
+  <text class="small" x="44" y="208">capture thread, 5 ms reads</text>
+  <text class="small" x="44" y="222">level meter, state</text>
+
+  <rect class="boxp" x="236" y="164" width="176" height="64" rx="10"/>
+  <text x="250" y="190">UdpAudioServer</text>
+  <text class="small" x="250" y="208">listener list + heartbeats</text>
+  <text class="small" x="250" y="222">answers DISCOVER</text>
+
+  <rect class="boxt" x="570" y="164" width="176" height="64" rx="10"/>
+  <text x="584" y="190">Network thread</text>
+  <text class="small" x="584" y="208">receive, check sequence,</text>
+  <text class="small" x="584" y="222">send HELLO every 1 s</text>
+
+  <rect class="boxt" x="770" y="164" width="180" height="64" rx="10"/>
+  <text x="784" y="190">Jitter queue</text>
+  <text class="small" x="784" y="208">target 30/60/120 ms</text>
+  <text class="small" x="784" y="222">+ adaptive headroom</text>
+
+  <rect class="boxt" x="770" y="264" width="180" height="58" rx="10"/>
+  <text x="784" y="288">Playback thread</text>
+  <text class="small" x="784" y="306">trims backlog, writes</text>
+
+  <rect class="boxt" x="570" y="264" width="176" height="58" rx="10"/>
+  <text x="584" y="288">AudioPlayer</text>
+  <text class="small" x="584" y="306">AudioTrack / SourceDataLine</text>
+
+  <path class="arrow" d="M120,128 L120,160"/>
+  <path class="arrow" d="M210,196 L232,196"/>
+  <path class="arrow" d="M412,190 L566,190"/>
+  <text x="430" y="180" class="small">UDP audio, 5 ms packets</text>
+  <path class="arrow" d="M746,196 L766,196"/>
+  <path class="arrow" d="M860,228 L860,260"/>
+  <path class="arrow" d="M770,293 L750,293"/>
+  <text x="590" y="340" class="small">🔊 speaker</text>
+  <path class="arrow2" d="M566,212 L416,212"/>
+  <text x="440" y="230" class="small">HELLO / BYE / DISCOVER</text>
+</svg>
+<ol>
+<li>The host's <b>AudioSource</b> hands over raw audio in 5&nbsp;ms pieces.</li>
+<li><b>HostEngine</b> runs a dedicated high-priority thread that reads each piece and immediately gives it to <b>UdpAudioServer</b>.</li>
+<li><b>UdpAudioServer</b> stamps a sequence number on it and sends one UDP datagram to every listener that has said HELLO in the last 4&nbsp;seconds.</li>
+<li>On the listener, a <b>network thread</b> receives datagrams, drops late duplicates, counts losses and puts audio into the <b>jitter queue</b>.</li>
+<li>A separate <b>playback thread</b> takes audio from the queue at the speaker's own pace, writes it to the <b>AudioPlayer</b>, and throws away any backlog so the delay never creeps up.</li>
+</ol>
+
+<h2 id="format">3. Audio format &amp; packet size</h2>
+<table>
+<tr><th>Setting</th><th>Value</th><th>Why</th></tr>
+<tr><td>Sample rate</td><td>48&nbsp;000&nbsp;Hz</td><td>Native rate of Windows and most Android devices, so neither side has to resample.</td></tr>
+<tr><td>Sample format</td><td>16&#8209;bit signed little-endian</td><td>CD quality, supported everywhere.</td></tr>
+<tr><td>Channels</td><td>2 (stereo)</td><td>One frame = 2 channels &times; 2 bytes = <b>4 bytes</b>.</td></tr>
+<tr><td>Packet</td><td>240 frames = 960 bytes = <b>5&nbsp;ms</b></td><td>Small enough that one packet is one Wi&#8209;Fi frame (under the ~1472&#8209;byte UDP limit, so no IP fragmentation, where losing one fragment loses the whole packet), and short enough to add only 5&nbsp;ms of capture delay.</td></tr>
+<tr><td>Bitrate</td><td>1.536&nbsp;Mbit/s per listener</td><td>Trivial for any Wi&#8209;Fi network; no codec needed.</td></tr>
+</table>
+
+<h2 id="protocol">4. The network protocol</h2>
+<p>Every datagram starts with a 4&#8209;byte header. Anything that doesn't start with <code>S A 1</code> is ignored.</p>
+<table>
+<tr><th>Bytes</th><th>Content</th></tr>
+<tr><td>0&ndash;1</td><td><code>'S' 'A'</code> magic</td></tr>
+<tr><td>2</td><td>protocol version (1)</td></tr>
+<tr><td>3</td><td>type: 1&nbsp;AUDIO, 2&nbsp;HELLO, 3&nbsp;BYE, 4&nbsp;DISCOVER, 5&nbsp;HOST_INFO</td></tr>
+<tr><td>4&ndash;7</td><td>(AUDIO only) sequence number, big-endian</td></tr>
+<tr><td>8&ndash;967</td><td>(AUDIO only) 960 bytes of PCM</td></tr>
+</table>
+<table>
+<tr><th>Message</th><th>Direction</th><th>Meaning</th></tr>
+<tr><td>HELLO</td><td>listener &rarr; host</td><td>"Send me audio." Repeated every second as a heartbeat. The host forgets a listener after 4&nbsp;s of silence, so crashed or departed listeners are cleaned up automatically.</td></tr>
+<tr><td>BYE</td><td>both ways</td><td>Listener: "stop sending". Host: "I'm stopping"; the listener shows <i>Waiting for host</i> and keeps sending HELLO so it resumes by itself when the host comes back.</td></tr>
+<tr><td>DISCOVER</td><td>listener &rarr; broadcast</td><td>"Any hosts out there?"</td></tr>
+<tr><td>HOST_INFO</td><td>host &rarr; listener</td><td>Reply with <code>platform|device name</code>, e.g. <code>desktop|MY-PC</code>.</td></tr>
+<tr><td>AUDIO</td><td>host &rarr; listener</td><td>5&nbsp;ms of PCM with a sequence number, so the listener can detect lost and out-of-order packets.</td></tr>
+</table>
+
+<h2 id="host">5. Host pipeline</h2>
+<p>The host's only job is to move audio from the capture device to the network as fast as possible. There is deliberately <b>no queue</b> on the host: the capture thread reads 5&nbsp;ms, sends it, and reads again. If anything is slow, audio is dropped rather than delayed.</p>
+<ul>
+<li><b>Windows:</b> <code>SystemAudioSource</code> tries WASAPI loopback first (captures the default speaker, no setup), then a JavaSound "Stereo Mix"-style device.</li>
+<li><b>Android:</b> <code>AudioStreamService</code> (a foreground service) obtains the <code>MediaProjection</code> and runs <code>PlaybackCaptureSource</code>.</li>
+<li>Both feed the same shared <code>HostEngine</code> and <code>UdpAudioServer</code>.</li>
+</ul>
+
+<h2 id="listener">6. Listener pipeline</h2>
+<p>The listener has two threads so that the network is never blocked by the speaker:</p>
+<ul>
+<li><b>Network thread</b>: blocks on <code>receive()</code> (200&nbsp;ms timeout), validates and copies each packet into a recycled buffer, puts it on the queue, and sends HELLO once a second.</li>
+<li><b>Playback thread</b>: waits until the queue holds the target amount ("priming"), then repeatedly takes one packet and writes it to the speaker. The write <i>blocks</i> until the speaker has room, so this thread naturally runs at the speaker's real clock.</li>
+</ul>
+
+<h2 id="latency">7. How lag is kept low</h2>
+<p>The previous version wrote packets straight to the speaker from the receive loop. Whenever the speaker was full, unread packets piled up in the operating system's socket buffer, which holds about a second of audio. Nothing ever removed them, so the delay grew whenever Wi&#8209;Fi burst or the two devices' clocks drifted apart. The current design fixes that at every stage:</p>
+<table>
+<tr><th>Stage</th><th>Delay</th><th>Technique</th></tr>
+<tr><td>Capture</td><td>5&ndash;10&nbsp;ms</td><td>5&nbsp;ms reads; WASAPI loopback instead of DirectSound; no host-side queue.</td></tr>
+<tr><td>Network</td><td>1&ndash;5&nbsp;ms on Wi&#8209;Fi</td><td>UDP, one Wi&#8209;Fi frame per packet, DSCP "EF" (voice) marking so routers with WMM prioritize it, Wi&#8209;Fi lock on Android.</td></tr>
+<tr><td>Jitter queue</td><td>30 / 60 / 120&nbsp;ms (+0&ndash;200 adaptive)</td><td>Pre-buffer to the target; if the queue grows beyond target + slack, skip back to target (bounded latency). If it starves because of jitter, add 20&nbsp;ms of headroom, and give 10&nbsp;ms back after each 20&nbsp;s without a dropout.</td></tr>
+<tr><td>Output</td><td>~20&ndash;40&nbsp;ms</td><td>Android <code>PERFORMANCE_MODE_LOW_LATENCY</code> with a small buffer; 40&nbsp;ms JavaSound line on desktop.</td></tr>
+</table>
+<div class="note">Measured in the automated tests on localhost: after a 400&nbsp;ms host stall followed by a burst, the listener is back at ~45&ndash;75&nbsp;ms. With delivery clumped every 100&nbsp;ms (like a phone's Wi&#8209;Fi in power-save), playback stayed uninterrupted at ~45&ndash;85&nbsp;ms.</div>
+
+<h2 id="discovery">8. Finding hosts</h2>
+<p>The Listen screen broadcasts DISCOVER to <code>255.255.255.255</code> and to every network interface's subnet broadcast address (some routers only pass one or the other), three times over 1.5&nbsp;s. Each host replies straight to the sender with HOST_INFO. If the router blocks broadcast (common on guest networks with "AP isolation"), you can still type the IP shown on the host screen.</p>
+
+<h2 id="android">9. Android specifics</h2>
+<ul>
+<li><b>Permissions:</b> <code>RECORD_AUDIO</code> (required by Android for playback capture), the screen-capture consent dialog (<code>MediaProjection</code>), <code>POST_NOTIFICATIONS</code> (Android 13+, to show the service notifications), <code>WAKE_LOCK</code> and foreground-service permissions.</li>
+<li><b>Hosting</b> runs inside <code>AudioStreamService</code>, a <code>mediaProjection</code> foreground service. Android 14+ requires the service to be in the foreground <i>before</i> <code>getMediaProjection()</code> is called and allows each consent to be used once, which is why the consent is "consumed" there.</li>
+<li><b>Listening</b> runs inside <code>ListenService</code>, a <code>mediaPlayback</code> foreground service. Without it Android freezes the app when the screen turns off and the audio stops.</li>
+<li><b>Power:</b> while streaming, a partial wake lock keeps the CPU awake, a <code>HIGH_PERF</code> Wi&#8209;Fi lock keeps the radio out of power-save with the screen off, and a <code>LOW_LATENCY</code> lock (Android 10+) further cuts latency while the screen is on.</li>
+<li><b>Limits:</b> apps can opt out of being captured (some streaming apps do), and capture needs Android 10+.</li>
+</ul>
+
+<h2 id="windows">10. Windows specifics</h2>
+<ul>
+<li><b>WASAPI loopback</b> is called through JNA (Java Native Access) by calling COM interface methods directly by their position in the vtable: <code>IMMDeviceEnumerator</code> &rarr; default render <code>IMMDevice</code> &rarr; <code>IAudioClient</code> (initialized with the <code>LOOPBACK</code> flag) &rarr; <code>IAudioCaptureClient</code>.</li>
+<li><code>AUTOCONVERTPCM</code> makes Windows convert from the device's mix format (often 32&#8209;bit float, sometimes 44.1&nbsp;kHz or 5.1) to our 48&nbsp;kHz/16&#8209;bit/stereo, so no conversion code is needed.</li>
+<li>Loopback produces no data while nothing is playing; the listener simply plays silence and re-primes when sound resumes.</li>
+<li>Windows Firewall must allow Java on private networks for listeners to reach the host.</li>
+</ul>
+
+<h2 id="threads">11. Threads at a glance</h2>
+<table>
+<tr><th>Thread</th><th>Where</th><th>Does</th></tr>
+<tr><td><code>StreamAudio-Capture</code></td><td>host</td><td>Read 5&nbsp;ms from the source &rarr; send to all listeners &rarr; update level meter. Audio priority.</td></tr>
+<tr><td><code>StreamAudio-HostControl</code></td><td>host</td><td>Receive HELLO/BYE/DISCOVER, expire silent listeners.</td></tr>
+<tr><td><code>StreamAudio-HostClose</code></td><td>host</td><td>Short-lived: sends BYE to listeners and closes the socket when hosting stops (sending isn't allowed on Android's main thread).</td></tr>
+<tr><td><code>StreamAudio-Receive</code></td><td>listener</td><td>Receive packets, heartbeat, statistics.</td></tr>
+<tr><td><code>StreamAudio-Playback</code></td><td>listener</td><td>Jitter-buffer control and speaker writes. Audio priority.</td></tr>
+<tr><td>Main / UI thread</td><td>both</td><td>Compose UI; collects <code>StateFlow</code>s; never touches sockets or audio devices.</td></tr>
+</table>
+
+<h2 id="ui">12. UI &amp; dark mode</h2>
+<p>All screens are shared Compose code. <code>StreamAudioTheme</code> chooses a hand-tuned Material&nbsp;3 light or dark colour scheme from the <i>System / Light / Dark</i> switch (saved in settings). On Android, the status-bar icons and the launch window background follow the same choice, so there is no white flash in dark mode. The layout is limited to 560&nbsp;dp wide, so it looks right on phones and in a wide desktop window.</p>
+
+<h2 id="tests">13. Tests</h2>
+<p><code>composeApp/src/jvmTest</code> runs the real networking code over localhost: server handshake and sequence numbers, discovery replies, end-to-end latency after a burst, adaptation to clumped delivery, WASAPI open/read, and repeated start/stop of real system-audio hosting. Run with <code>gradlew :composeApp:jvmTest</code>.</p>
+
+<h2 id="walkthrough">14. Code walkthrough</h2>
+<p>Files appear in the order the audio flows through them: protocol, then host, then listener, then platform glue, then UI. Expand "package declaration and imports" to see each file's first lines. Every other line is shown.</p>
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/StreamProtocol.kt | StreamProtocol.kt: format &amp; wire protocol@@
+@@AT /**@@
+<p><code>StreamConfig</code> is the single source of truth for the audio format. Both host and listener use these constants, so they can't disagree.</p>
+<ul>
+<li><code>DEFAULT_PORT</code>: the UDP port the host listens on.</li>
+<li><code>SAMPLE_RATE</code>, <code>CHANNELS</code>, <code>BYTES_PER_FRAME</code>: 48&nbsp;kHz stereo 16&#8209;bit, so one frame (one sample for each channel) is 4 bytes.</li>
+<li><code>FRAMES_PER_PACKET = 240</code> gives <code>PACKET_BYTES = 960</code> and <code>PACKET_MS = 5</code>. These are computed from each other, so changing one keeps the rest consistent.</li>
+</ul>
+@@AT /** Listener re-sends HELLO@@
+<p>Heartbeat timing: listeners say HELLO every second; the host drops any listener it hasn't heard from in 4&nbsp;seconds (four missed heartbeats). That tolerates occasional packet loss while still cleaning up listeners that vanish without saying BYE.</p>
+@@AT /** How much audio@@
+<p><code>LatencyMode</code> is the user-facing buffer choice on the Listen screen. <code>targetMs</code> is how much audio the listener tries to keep queued; <code>label</code> and <code>description</code> are shown in the UI.</p>
+@@AT /**@@
+<p><code>StreamProtocol</code> builds and parses datagrams. The magic bytes and version let the app ignore unrelated UDP traffic on the same port. <code>TYPE_*</code> are the five message kinds from section&nbsp;4. <code>HEADER_SIZE</code> is the 4&#8209;byte common header; audio adds 4 bytes of sequence number, so <code>MAX_DATAGRAM</code> is 968 bytes. It is <code>internal</code> because only this module needs it.</p>
+@@AT fun writeHeader@@
+<p>Writes <code>'S' 'A' version type</code> into the first four bytes of a buffer. Used for every outgoing message.</p>
+@@AT /** Returns the packet type@@
+<p>Validates an incoming datagram: too short, wrong magic or wrong version returns <code>null</code> (ignored), otherwise returns the type byte for a <code>when</code> to switch on.</p>
+@@AT fun control(@@
+<p>Builds a small control message (HELLO, BYE, DISCOVER, HOST_INFO) with an optional payload, such as the device name in HOST_INFO.</p>
+@@AT fun writeInt(@@
+<p>Stores a 32&#8209;bit integer big-endian (most significant byte first), the conventional network byte order. Used for the sequence number.</p>
+@@AT fun readInt(@@
+<p>The inverse of <code>writeInt</code>. <code>and 0xFF</code> stops Kotlin's signed bytes from smearing their sign bits into the result.</p>
+@@AT /** Peak absolute amplitude@@
+<p>Computes the loudest sample in a chunk of PCM (0.0 = silence, 1.0 = full scale) for the level bars in the UI. Each 16&#8209;bit sample is little-endian: the low byte is masked with <code>0xFF</code> and the high byte is shifted left by 8 (keeping its sign). The loop steps 2 bytes at a time across both channels. It's very cheap, so it runs on every packet on both host and listener.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/Platform.kt | Platform.kt: the platform contract@@
+@@AT /** Short platform tag@@
+<p>Kotlin Multiplatform <code>expect</code> declarations: common code says <i>what</i> it needs, and <code>Platform.android.kt</code> / <code>Platform.jvm.kt</code> provide the <code>actual</code> implementations. <code>platformTag</code> ("android"/"desktop") and <code>deviceName()</code> go into discovery replies so the Listen screen can show a phone or computer icon and a friendly name.</p>
+@@AT /** Raises the calling thread@@
+<p>Called at the start of the capture and playback threads. On Android it sets <code>THREAD_PRIORITY_URGENT_AUDIO</code> so the scheduler favours these threads, which prevents dropouts when the UI is busy.</p>
+@@AT /**@@
+<p>Holds whatever keeps the network and CPU awake while streaming, and returns an <code>AutoCloseable</code> that releases it. On desktop it does nothing.</p>
+@@AT /**@@
+<p>Hook called when listening starts. On Android it starts the <code>ListenService</code> foreground service so playback survives the screen turning off; on desktop it does nothing.</p>
+@@AT /** The one receiver@@
+<p>A single, process-wide <code>UdpAudioReceiver</code>. Keeping it outside any screen or ViewModel means playback isn't interrupted by rotation, the screen turning off, or the app being swiped away. Both the UI and <code>ListenService</code> talk to this same instance.</p>
+@@AT /** Null when this device@@
+<p>If hosting is impossible on this device (Android below 10), this holds the reason. The Home screen then disables the Host card and shows it.</p>
+@@AT /** Platform entry point@@
+<p>Returns the platform's <code>HostController</code>: directly a <code>HostEngine</code> on desktop, the service-backed <code>AndroidHost</code> on Android.</p>
+@@AT /** Tiny persistent@@
+<p>Saves small UI preferences (theme, latency mode, last host IP). <code>SharedPreferences</code> on Android, <code>java.util.prefs</code> on desktop.</p>
+@@AT interface HostController@@
+<p>What the UI can do with hosting: observe <code>state</code>, <code>start()</code>, <code>stop()</code>.</p>
+@@AT /**@@
+<p><code>AudioSource</code> is the capture abstraction. Every source delivers the same format. <code>read</code> returns 0 when nothing arrived in about 100&nbsp;ms (for example when WASAPI is silent), which lets the capture loop check whether it should stop. It returns &minus;1 when the device died.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/UdpAudioServer.kt | UdpAudioServer.kt: host networking@@
+@@AT /**@@
+<p>The host's UDP endpoint. <code>onListenersChanged</code> is a callback so <code>HostEngine</code> can show the listener count.</p>
+@@AT private val clients@@
+<p>The listener list: socket address &rarr; time of last HELLO. A <code>ConcurrentHashMap</code> because the control thread adds and removes entries while the capture thread iterates over them.</p>
+@@AT private val socket@@
+<p>Opens the socket in two steps: <code>reuseAddress = true</code> must be set before <code>bind</code>, so the port can be re-bound immediately after a stop (otherwise you'd get "address already in use"). The bind is done in <code>also { }</code> on purpose: inside <code>apply { }</code>, <code>port</code> would refer to <code>DatagramSocket.getPort()</code> (&minus;1), a bug the tests caught. Then:</p>
+<ul>
+<li><code>broadcast = true</code> allows replying to broadcast discovery.</li>
+<li><code>sendBufferSize = 64 KB</code> is enough for bursts to many listeners.</li>
+<li><code>trafficClass = 0xB8</code> marks packets DSCP EF ("voice"). Wi&#8209;Fi access points with WMM put them in the highest-priority queue. It's wrapped in <code>runCatching</code> because some systems refuse it.</li>
+</ul>
+@@AT private val sendBuffer@@
+<p>One reusable buffer and <code>DatagramPacket</code> for all audio sends, so sending 200 packets per second creates no garbage. <code>sequence</code> counts packets.</p>
+@@AT private val hostInfo@@
+<p>The discovery reply, built once: <code>"desktop|MY-PC"</code> or <code>"android|Pixel 8"</code>.</p>
+@@AT init {@@
+<p>Starts the control thread as a <i>daemon</i> thread, so it never keeps the app alive on its own.</p>
+@@AT private fun controlLoop@@
+<p>The control thread. <code>soTimeout = 1000</code> wakes <code>receive()</code> every second even if nothing arrives, so stale listeners are pruned on schedule. <code>packet.setLength(buffer.size)</code> must be reset before every receive: Java shrinks a packet's length to the size of the last message, which would silently truncate later, larger ones. A closed socket throws <code>IOException</code>, which ends the loop.</p>
+@@AT private fun handleControl@@
+<p>Handles one control message:</p>
+<ul>
+<li><b>HELLO</b>: add the listener or refresh its timestamp. <code>put</code> returns <code>null</code> only for a new listener, which is when the count changes.</li>
+<li><b>BYE</b>: remove the listener immediately.</li>
+<li><b>DISCOVER</b>: reply with <code>hostInfo</code> to whoever asked.</li>
+</ul>
+@@AT private fun pruneStaleClients@@
+<p>Removes listeners whose last HELLO is older than 4&nbsp;seconds, and publishes the new count if anyone was removed. <code>now()</code> is wall-clock milliseconds.</p>
+@@AT fun sendAudio@@
+<p>The hot path, called by the capture thread every 5&nbsp;ms. The sequence number increments even with no listeners, so numbers stay continuous. With no listeners it returns early. Otherwise it writes the header and sequence, copies the PCM after it, and sends the same packet object to each listener by changing only its destination. A failed send is ignored: the heartbeat timeout handles truly dead listeners, and one failure must never stall the others.</p>
+@@AT fun stop()@@
+<p>Stops hosting cleanly. It snapshots the listeners, clears the list and reports 0. Then a short worker thread sends each listener a BYE and closes the socket, because Android forbids network I/O on the main thread, where <code>stop()</code> is usually called from. <code>join(250)</code> waits briefly so the port is free if the user starts hosting again straight away.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/HostEngine.kt | HostEngine.kt: host pipeline &amp; state@@
+@@AT enum class HostStatus@@
+<p><code>HostState</code> is everything the Host screen shows: status, listener count, source name, live level, and a message for errors. It is an immutable data class, so each change is a new value and Compose recomposes reliably.</p>
+@@AT /**@@
+<p>The engine is deliberately simple: one thread, no queues, no coroutines in the audio path.</p>
+@@AT private class Session@@
+<p>A <code>Session</code> bundles one hosting run: its server, source, network lock and a <code>@Volatile running</code> flag that the capture thread checks. Using a fresh object per run means a slow-dying old thread can never affect a new run, since every update checks "am I still the current session?".</p>
+@@AT private val _state@@
+<p>The private mutable <code>StateFlow</code> plus a read-only view for the UI. <code>session</code> is <code>@Volatile</code> because it's read from several threads.</p>
+@@AT fun start(source@@
+<p>Starts hosting inside <code>synchronized</code> (so a double tap can't start twice):</p>
+<ul>
+<li>Sets state to <i>Starting</i>.</li>
+<li>Creates the server. A <code>BindException</code> means the port is taken (usually another copy of the app), so it shows a clear message.</li>
+<li>Takes the network lock and creates the session.</li>
+<li>Starts the capture thread. The source is opened <i>on that thread</i>, not here, so a slow device open never freezes the UI.</li>
+</ul>
+@@AT fun stop()@@
+<p>Takes the session out under the lock (so only one caller stops it), flags the thread to finish, stops the server (which sends BYE), releases the network lock and resets the state to <i>Idle</i>. The capture thread closes the audio source itself when it exits; closing it from here could pull it out from under a <code>read()</code> in progress.</p>
+@@AT /** Surfaces a problem@@
+<p>Lets Android's service report errors that happen before capture starts (no permission, Android refused the projection) so the Host screen can show them.</p>
+@@AT private fun captureLoop@@
+<p>The capture thread. It raises its priority to audio, then opens the source. On failure (for example "No system-audio capture device found") the run ends with an error state. On success it switches to <i>Live</i> and shows the real source name.</p>
+@@AT val buffer = ByteArray(StreamConfig.PACKET_BYTES)@@
+<p>The main loop, run while <code>running</code>:</p>
+<ul>
+<li><code>read</code> blocks for up to one packet. &minus;1 means the device died (for example the speaker was unplugged), which becomes an error.</li>
+<li>The read size is trimmed to whole frames, because sending half a frame would swap left and right channels from then on.</li>
+<li><code>sendAudio</code> sends immediately: the host keeps no queue at all.</li>
+<li>The peak level is accumulated and published at most every 50&nbsp;ms (20 times per second), which is smooth for the meter without flooding the UI.</li>
+</ul>
+<p>Any exception while running becomes an error state. <code>finally</code> always closes the source on this same thread.</p>
+@@AT private fun fail@@
+<p>Error path: if this session is still current, it ends it (server, lock) and publishes an <i>Error</i> state with the message. If it isn't current (the user already pressed Stop), the error is ignored.</p>
+@@AT private inline fun updateIfCurrent@@
+<p>Updates state only while a session exists, and, when a session is given, only if it's the current one. This prevents a finishing old thread from overwriting a newer state.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/jvmMain/kotlin/com/example/streamaudio/WasapiLoopbackSource.kt | WasapiLoopbackSource.kt: Windows system-audio capture@@
+@@AT /**@@
+<p>Captures exactly what the default Windows output device plays, with no driver feature or setting required, unlike "Stereo Mix".</p>
+@@AT private var comInitialized@@
+<p>Raw pointers to the four COM objects in the chain. <code>comInitialized</code> remembers whether this thread initialized COM, so it only uninitializes what it initialized.</p>
+@@AT // Captured audio not yet@@
+<p><code>pending</code> is an accumulator of about 200&nbsp;ms. WASAPI hands over audio in device periods of about 10&nbsp;ms, but the engine wants exactly 5&nbsp;ms, so data waits here until a full packet is available.</p>
+@@AT private val nextPacketFrames@@
+<p>JNA "by reference" output parameters, created once and reused on every call, so no allocation happens in the capture loop.</p>
+@@AT override fun open()@@
+<p>Builds the WASAPI chain:</p>
+<ul>
+<li><code>CoInitializeEx(MULTITHREADED)</code>: S_OK or S_FALSE means this call initialized COM (S_FALSE: already initialized on this thread; each still needs a matching uninit). Anything else, such as "changed mode", means don't uninit.</li>
+<li><code>CoCreateInstance(MMDeviceEnumerator)</code>: the object that lists audio devices.</li>
+<li>vtable index 4 = <code>GetDefaultAudioEndpoint(eRender, eConsole)</code>: the default speaker.</li>
+<li>index 3 = <code>IMMDevice::Activate(IAudioClient)</code>: an audio client for that device.</li>
+</ul>
+<p>(Index numbers count from the three <code>IUnknown</code> methods, which come first in every COM interface.)</p>
+@@AT val format = Memory(18)@@
+<p>Writes a <code>WAVEFORMATEX</code> by hand (18 bytes, packed): tag&nbsp;1 = PCM, 2 channels, 48000&nbsp;Hz, bytes per second, block align 4, 16 bits, no extra bytes. <code>Initialize</code> (index&nbsp;3) is called in shared mode with:</p>
+<ul>
+<li><code>LOOPBACK</code>: record what the render device is playing.</li>
+<li><code>AUTOCONVERTPCM | SRC_DEFAULT_QUALITY</code>: Windows converts the mix format to ours.</li>
+<li>A 100&nbsp;ms buffer (in 100&#8209;ns units). For capture this is just headroom; it adds no delay because the loop drains it continuously.</li>
+</ul>
+<p>Then <code>GetService</code> (index&nbsp;14) returns the <code>IAudioCaptureClient</code>, and <code>Start</code> (index&nbsp;10) begins capture.</p>
+@@AT override fun read(@@
+<p>Fills the caller's buffer from <code>pending</code>. While there isn't enough data, it drains the device; if nothing new arrived it sleeps 2&nbsp;ms. Loopback delivers nothing during silence, so after 100&nbsp;ms it returns 0, letting the engine check whether it should stop. When enough data is ready, it copies one packet out and shifts the remainder to the front.</p>
+@@AT /** Moves every packet@@
+<p>Moves all audio WASAPI has ready into <code>pending</code>:</p>
+<ul>
+<li><code>GetNextPacketSize</code> (capture index&nbsp;5): 0 means nothing is waiting.</li>
+<li><code>GetBuffer</code> (index&nbsp;3) gives a pointer to the data, the frame count and flags.</li>
+<li>If <code>pending</code> would overflow (the reader fell behind), the <i>oldest</i> audio is dropped: being current matters more than being complete.</li>
+<li>The <code>SILENT</code> flag means "treat as zeros", so the data pointer may be garbage.</li>
+<li><code>ReleaseBuffer</code> (index&nbsp;4) hands the space back to Windows.</li>
+</ul>
+@@AT override fun close()@@
+<p>Stops the client (index&nbsp;11), calls <code>Release</code> (index&nbsp;2) on every COM object in reverse order of creation, and balances <code>CoInitializeEx</code>.</p>
+@@AT /** Calls method@@
+<p>The tiny COM bridge. A COM object pointer points to its vtable; entry <i>n</i> is the address of method <i>n</i>. JNA wraps that address as a <code>Function</code> and calls it with the object itself as the first argument (<code>this</code>). <code>ALT_CONVENTION</code> selects stdcall, needed on 32&#8209;bit Windows and harmless on 64&#8209;bit.</p>
+@@AT private fun hr(@@
+<p>HRESULT checking: negative values are failures. The error message includes the hex code (searchable online) and explains the common "device changed" case.</p>
+@@AT private companion object@@
+<p>The Windows constants and interface GUIDs, copied from the Windows SDK headers (<code>mmdeviceapi.h</code>, <code>audioclient.h</code>). Constants that don't fit in a signed <code>Int</code> use <code>.toInt()</code> to keep the bit pattern.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/jvmMain/kotlin/com/example/streamaudio/JavaSoundCaptureSource.kt | JavaSoundCaptureSource.kt: fallback capture + source selection@@
+@@AT /** Fallback capture@@
+<p>Fallback for systems without WASAPI (or where it fails). <code>name</code> is updated to the real device name once one is found.</p>
+@@AT override fun open()@@
+<p>Searches all JavaSound mixers for a recording device whose name suggests loopback ("Stereo Mix", "What U Hear", PulseAudio's "Monitor of&hellip;") <i>and</i> which supports our format. It never falls back to the microphone, which would surprise the user. The line is opened with a 40&nbsp;ms buffer (8 packets) and started.</p>
+@@AT override fun read(@@
+<p>A blocking read straight from the line.</p>
+@@AT override fun close()@@
+<p>Stops and closes the line.</p>
+@@AT /** Tries WASAPI loopback first@@
+<p><code>SystemAudioSource</code> is what desktop hosting actually uses. <code>open()</code> tries each candidate in order (WASAPI on Windows, then JavaSound) and keeps the first that opens. Failed ones are closed. If all fail, the last error message is shown in the UI.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/androidMain/kotlin/com/example/streamaudio/PlaybackCaptureSource.kt | PlaybackCaptureSource.kt: Android system-audio capture@@
+@@AT /** Captures audio other apps@@
+<p>Android 10+ capture of audio that other apps play, authorized by a <code>MediaProjection</code>. <code>@RequiresApi(Q)</code> makes the compiler check that it's only used on Android 10+.</p>
+@@AT override fun open()@@
+<p>The buffer is twice Android's minimum, and at least 40&nbsp;ms: big enough to avoid overruns, small enough to keep delay low.</p>
+@@AT val config = AudioPlaybackCaptureConfiguration@@
+<p>What to capture: audio tagged as media (music, video), games, and unknown. Calls and notifications are excluded.</p>
+@@AT val r = AudioRecord.Builder()@@
+<p>Builds an <code>AudioRecord</code> in our exact format, fed by the playback-capture configuration instead of the microphone.</p>
+@@AT if (r.state@@
+<p>If Android couldn't create it (usually a missing permission), the object is released and the error explained. Otherwise recording starts.</p>
+@@AT override fun read(@@
+<p>A blocking read; negative Android error codes are mapped to &minus;1 ("source ended").</p>
+@@AT override fun close()@@
+<p>Stops and releases the recorder (it holds native resources).</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/UdpAudioReceiver.kt | UdpAudioReceiver.kt: listener networking &amp; jitter buffer@@
+@@AT enum class ReceiverStatus@@
+<p>Listener states: <i>Connecting</i> (no audio yet), <i>Buffering</i> (priming the queue), <i>Playing</i>, <i>HostLost</i> (host said BYE or went silent for 2.5&nbsp;s; still retrying), <i>Error</i>. <code>ReceiverState</code> carries what the Listen screen shows; <code>isActive</code> means "a session is running".</p>
+@@AT /**@@
+<p>The class comment summarizes the core idea: the network thread never waits for the speaker, so the socket buffer can't fill with stale audio, and the playback thread keeps the queue near the target.</p>
+@@AT private class Chunk@@
+<p>A reusable 5&nbsp;ms audio buffer plus how many bytes are valid.</p>
+@@AT private inner class Session@@
+<p>One listening run:</p>
+<ul>
+<li><code>queue</code>: the jitter buffer, capped at 1&nbsp;s.</li>
+<li><code>pool</code>: recycled chunks, so receiving allocates nothing in steady state.</li>
+<li>Statistics fields: each is written by one thread and read by others for display, so <code>@Volatile</code> is enough.</li>
+</ul>
+@@AT private val _state@@
+<p>The state exposed to the UI, the current session, and the latency mode. The mode is <code>@Volatile</code> so the playback thread sees a change the moment you tap a different mode.</p>
+@@AT fun start(host@@
+<p>Stops any previous session, creates a new one, shows <i>Connecting</i>, and starts the two threads.</p>
+@@AT fun stop()@@
+<p>Detaches the session and flags it to stop. The network thread notices within one 200&nbsp;ms receive timeout, sends BYE and closes the socket itself; this function does no network I/O, which matters on Android's main thread.</p>
+@@AT // ---------------------------------------------------------------- network@@
+<p>(Section divider.)</p>
+@@AT private fun networkLoop@@
+<p>The network thread starts by taking the low-latency network lock. It resolves the host and opens an unbound socket (the OS picks a free port). The 256&nbsp;KB receive buffer is only a safety net, since this thread drains it continuously. A 200&nbsp;ms timeout lets the loop do its timed work, and the voice DSCP marking is applied. If <code>stop()</code> raced ahead, it exits.</p>
+@@AT val hello = StreamProtocol.control@@
+<p>Prebuilt HELLO and BYE packets for this host, a receive buffer with some slack, and the loop's local state: last heartbeat time, last statistics time, expected next sequence number, and whether the host said BYE.</p>
+@@AT while (s.running) {@@
+<p>Each loop iteration first does the timed work:</p>
+<ul>
+<li>HELLO once a second. This both subscribes and keeps the subscription alive. It keeps going while the host is away, so playback resumes automatically when the host returns.</li>
+<li>Statistics to the UI 4 times a second.</li>
+</ul>
+<p>Then it waits for a datagram. <code>setLength</code> is reset before every receive (see the server for why); the old code missed this, so one short packet would truncate every later one.</p>
+@@AT StreamProtocol.TYPE_AUDIO -> {@@
+<p>Handling an audio packet:</p>
+<ul>
+<li>Rejects empty or oversized payloads.</li>
+<li>Sequence check: a packet <i>behind</i> the expected number (late or duplicated) is dropped, because we've already played past that moment. A jump ahead counts the missing ones as lost. The &plusmn;1000 window treats huge jumps (host restarted, counter reset) as a fresh start.</li>
+<li>Takes a chunk from the pool, copies the PCM in, and trims it to whole frames.</li>
+<li>Queues it. If the 1&nbsp;s hard cap is ever hit, the oldest chunk is dropped to make room: newest audio wins.</li>
+</ul>
+<p>A BYE from the host marks it as gone. Any later audio clears that flag.</p>
+@@AT } catch (e: Exception) {@@
+<p>Errors become user-readable messages (unknown host, network error). <code>finally</code> always releases the network lock, sends BYE if possible, and closes the socket, all on this thread.</p>
+@@AT private fun publishStats@@
+<p>Works out what the UI shows:</p>
+<ul>
+<li><b>Status</b>: <i>Connecting</i> until the first packet; <i>HostLost</i> after BYE or 2.5&nbsp;s of silence; otherwise <i>Playing</i> or <i>Buffering</i>, depending on the playback thread.</li>
+<li><b>Loss %</b>: over a rolling window that resets after 2000 packets, so it reflects recent conditions.</li>
+<li><b>Delay</b>: queued packets &times; 5&nbsp;ms + the speaker's buffer.</li>
+<li><b>Level</b>: shown only while playing.</li>
+</ul>
+@@AT // ---------------------------------------------------------------- playback@@
+<p>(Section divider.)</p>
+@@AT private fun playbackLoop@@
+<p>The playback thread raises its priority to audio, opens the speaker, and records its buffer delay for the statistics.</p>
+@@AT // Adaptive headroom@@
+<p>The adaptive part: <code>extra</code> is headroom added on top of the chosen mode. <code>underrunAt</code> records when the queue last ran dry, and <code>lastAdjust</code> when headroom last changed.</p>
+@@AT while (s.running) {@@
+<p>Each iteration computes the target (mode + <code>extra</code>, in packets) and the slack (half the target, at least 20&nbsp;ms) allowed before trimming.</p>
+<p><b>Priming:</b> after start or a dropout, nothing plays until the queue reaches the target, so playback starts with a full cushion. When priming completes shortly (under 1.5&nbsp;s) after a dropout, the dropout was network jitter rather than the host going quiet, so 20&nbsp;ms of headroom is added (up to 200&nbsp;ms). While priming, the thread sleeps 2&nbsp;ms between checks.</p>
+@@AT // Latency control:@@
+<p><b>The lag fix.</b> If a Wi&#8209;Fi burst or clock drift pushed the queue beyond target + slack, packets are discarded until the queue is back at the target. This bounds the delay; without it, a backlog would be heard as delay forever.</p>
+@@AT val chunk = s.queue.poll@@
+<p>Takes the next packet, waiting at most 30&nbsp;ms. If none arrives, the queue starved: playback returns to priming and the time is recorded for the adaptive logic.</p>
+<p>When the connection has been stable for 20&nbsp;s, 10&nbsp;ms of headroom is given back, so the delay returns to normal once conditions improve.</p>
+<p>The chunk is written to the speaker. The write blocks until there's room, which paces this thread to the speaker's real clock. The level is measured, the chunk recycled, and the level published every 50&nbsp;ms. <code>finally</code> always closes the speaker.</p>
+@@AT private fun fail@@
+<p>Ends the session with an error, if it's still the current one.</p>
+@@AT private companion object@@
+<p>Limits: the queue never holds more than 1&nbsp;s (200 packets), and adaptive headroom never exceeds 200&nbsp;ms.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/AudioPlayer.kt | AudioPlayer.kt: speaker contract@@
+@@AT /** Low-latency PCM output@@
+<p>An <code>expect class</code>: each platform supplies an <code>actual class</code> with these exact members. <code>write</code> is <i>blocking</i> by contract; the playback thread depends on that for pacing.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/jvmMain/kotlin/com/example/streamaudio/AudioPlayer.jvm.kt | AudioPlayer.jvm.kt: desktop speaker@@
+@@AT actual class AudioPlayer@@
+<p>Desktop output through a JavaSound <code>SourceDataLine</code>.</p>
+@@AT actual val outputLatencyMs@@
+<p>The line's buffer size converted to milliseconds, for the Delay figure.</p>
+@@AT actual fun start()@@
+<p>Opens the default speaker in our format with a 40&nbsp;ms buffer. The old 4&nbsp;KB (21&nbsp;ms) buffer underran constantly and crackled; 40&nbsp;ms absorbs scheduler hiccups while staying small.</p>
+@@AT actual fun write(@@
+<p>A blocking write.</p>
+@@AT actual fun stop()@@
+<p>Stops, flushes and closes. It intentionally doesn't call <code>drain()</code>, which would wait for the buffer to play out and made disconnecting feel sluggish.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/androidMain/kotlin/com/example/streamaudio/AudioPlayer.android.kt | AudioPlayer.android.kt: Android speaker@@
+@@AT actual class AudioPlayer@@
+<p>Android output through <code>AudioTrack</code> in streaming mode.</p>
+@@AT actual val outputLatencyMs@@
+<p>The track's buffer size in milliseconds.</p>
+@@AT actual fun start()@@
+<p>The buffer is Android's minimum, but at least 20&nbsp;ms; the jitter queue handles network timing, so the device buffer can stay small. The attributes say "music media", so volume keys and audio focus behave like any music app.</p>
+@@AT if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)@@
+<p><code>PERFORMANCE_MODE_LOW_LATENCY</code> (Android 8+) asks for the "fast mixer" path, which removes tens of milliseconds of output delay on most phones. The track is checked to be initialized, then started.</p>
+@@AT actual fun write(@@
+<p>A blocking write.</p>
+@@AT actual fun stop()@@
+<p>Pause + flush discards queued audio instantly (no tail after Disconnect), then stop and release the native resources.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/HostDiscovery.kt | HostDiscovery.kt: finding hosts &amp; local IPs@@
+@@AT data class DiscoveredHost@@
+<p>A found host (name, IP, phone or not) and a local address (IP + adapter name) shown on the Host screen.</p>
+@@AT object HostDiscovery@@
+<p>Discovery helpers, used from a background coroutine.</p>
+@@AT /** Broadcasts a DISCOVER@@
+<p>Opens a temporary socket with broadcast enabled and a 150&nbsp;ms timeout. The probe goes to every interface's subnet broadcast address and to <code>255.255.255.255</code>.</p>
+@@AT while (System.currentTimeMillis() < deadline)@@
+<p>Re-sends the probe every 400&nbsp;ms (broadcast is easily lost on Wi&#8209;Fi) and collects replies until the deadline.</p>
+@@AT if (StreamProtocol.typeOf(buffer, packet.length) != StreamProtocol.TYPE_HOST_INFO)@@
+<p>Keeps only HOST_INFO replies, splits <code>platform|name</code>, and stores them by IP so a host answering several probes appears once.</p>
+@@AT private fun broadcastAddresses@@
+<p>Subnet broadcast addresses (for example <code>192.168.1.255</code>) of all active, non-loopback interfaces.</p>
+@@AT /** IPv4 addresses@@
+<p>The addresses shown on the Host screen: active, non-virtual interfaces with private (site-local) IPv4 addresses, Wi&#8209;Fi first.</p>
+@@AT private fun looksVirtual@@
+<p>Hides adapters a listener can't reach: Hyper-V, WSL, VirtualBox, VMware, Docker and VPN tunnels.</p>
+@@AT private fun rank@@
+<p>Sort order: Wi&#8209;Fi, then Ethernet, then anything else.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/jvmMain/kotlin/com/example/streamaudio/Platform.jvm.kt | Platform.jvm.kt: desktop implementations@@
+@@AT actual val platformTag@@
+<p>The desktop identity: the Windows computer name (from the <code>COMPUTERNAME</code> environment variable), else the hostname.</p>
+@@AT actual fun boostAudioThreadPriority@@
+<p>Java's maximum thread priority.</p>
+@@AT actual fun holdLowLatencyNetwork@@
+<p>Desktop needs no locks or service, and can always host.</p>
+@@AT private object DesktopHost@@
+<p>On desktop, the controller is simply a <code>HostEngine</code> started with <code>SystemAudioSource</code>.</p>
+@@AT actual object AppSettings@@
+<p>Settings stored with <code>java.util.prefs</code>, which uses the registry on Windows. <code>flush()</code> writes immediately.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/androidMain/kotlin/com/example/streamaudio/Platform.android.kt | Platform.android.kt: Android implementations@@
+@@AT actual val platformTag@@
+<p>The Android identity.</p>
+@@AT actual fun deviceName()@@
+<p>The name the user gave the phone (Settings &rarr; About, Android 7.1+), else manufacturer + model, for example "Samsung SM-S918B".</p>
+@@AT actual fun boostAudioThreadPriority@@
+<p><code>URGENT_AUDIO</code>, the priority Android's own audio threads use.</p>
+@@AT actual fun holdLowLatencyNetwork@@
+<p>Collects release actions for everything it manages to acquire.</p>
+@@AT // Keep the CPU running@@
+<p>A <b>partial wake lock</b> keeps the CPU running with the screen off. It is not reference-counted, so a single release frees it.</p>
+@@AT (ctx.getSystemService(Context.WIFI_SERVICE)@@
+<p><b>Wi&#8209;Fi locks</b>: <code>HIGH_PERF</code> keeps the radio out of power-save with the screen off (it's what media players use), and <code>LOW_LATENCY</code> (Android 10+) further reduces latency while the screen is on. The returned <code>AutoCloseable</code> releases everything.</p>
+@@AT actual fun onListeningStarted@@
+<p>Starts <code>ListenService</code> as a foreground service.</p>
+@@AT actual val hostingUnsupportedReason@@
+<p>Hosting needs Android 10 (API 29) for playback capture.</p>
+@@AT /**@@
+<p><code>AndroidHost</code> is the single host for the process. <code>start()</code> asks <code>AudioStreamService</code> to start, because the media projection must be created inside a foreground service. <code>stop()</code> stops the service (whose <code>onDestroy</code> cleans up) and the engine.</p>
+@@AT actual fun createHostController@@
+<p>Every <code>ServerViewModel</code> gets the same <code>AndroidHost</code>.</p>
+@@AT actual object AppSettings@@
+<p>Settings in <code>SharedPreferences</code>. They load lazily, because the context only exists after the activity starts. <code>apply()</code> writes in the background.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/androidMain/kotlin/com/example/streamaudio/AndroidPermissionHelper.kt | AndroidPermissionHelper.kt: shared Android state@@
+@@AT /** Process-wide Android state@@
+<p>Holds the application context, which common code needs for settings, Wi&#8209;Fi and so on. Only the application context is stored, never an activity, so nothing leaks.</p>
+@@AT /** The screen-capture consent@@
+<p>Stores the result of the screen-capture consent dialog until the service uses it.</p>
+@@AT /** Hands out the consent@@
+<p>Returns the consent and clears it in one step. Android 14+ throws if the same consent is used twice, and the old code did exactly that (two streamers shared one token).</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/androidMain/kotlin/com/example/streamaudio/AudioStreamService.kt | AudioStreamService.kt: Android hosting service@@
+@@AT /**@@
+<p>The foreground service that owns Android hosting.</p>
+@@AT private var projection@@
+<p>The active projection. The callback fires if the user stops sharing from the system's cast/screen-share indicator; the service then stops itself.</p>
+@@AT override fun onStartCommand@@
+<p>Two commands: STOP (from the notification) and START (from <code>AndroidHost.start()</code>). <code>START_NOT_STICKY</code>: if Android kills the process, it doesn't restart the service, because a new consent would be needed anyway.</p>
+@@AT private fun startHosting()@@
+<p>Goes foreground <i>first</i>, with type <code>MEDIA_PROJECTION</code>, as Android 14 requires before obtaining a projection. On Android below 10 it reports an error. It returns early if already hosting.</p>
+@@AT val (resultCode, data)@@
+<p>Consumes the one-time consent and creates the <code>MediaProjection</code>. Every failure is reported to the Host screen. Then it registers the stop callback and starts the engine with a <code>PlaybackCaptureSource</code>.</p>
+@@AT private fun failAndStop@@
+<p>Stops the service and shows the reason in the UI.</p>
+@@AT override fun onDestroy()@@
+<p>Always runs when the service ends, whether by the Stop button, the notification or the system indicator. It stops the engine and releases the projection.</p>
+@@AT private fun buildNotification()@@
+<p>The required ongoing notification: channel "Audio sharing" (low importance, no sound), tapping it opens the app, and a <b>Stop</b> action. <code>FLAG_IMMUTABLE</code> is required for <code>PendingIntent</code>s on Android 12+.</p>
+@@AT companion object@@
+<p>Intent actions and the IDs of the notification and its channel.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/androidMain/kotlin/com/example/streamaudio/ListenService.kt | ListenService.kt: Android background playback@@
+@@AT /**@@
+<p>This service is why audio keeps playing with the phone's screen off. As a <code>mediaPlayback</code> foreground service, it tells Android that the app is actively playing audio, so the process isn't frozen or throttled.</p>
+@@AT private val scope@@
+<p>A coroutine scope on the main thread, used to observe the receiver. <code>started</code> prevents setting up twice if the service is started again.</p>
+@@AT override fun onStartCommand@@
+<p>A DISCONNECT action (from the notification button) stops the shared receiver. On the first start, the service goes foreground.</p>
+@@AT scope.launch {@@
+<p>The service follows the receiver's state instead of being stopped explicitly. When the session ends (Disconnect in the app or the notification, or an error), it removes its notification and stops itself. While active, it updates the notification text ("Playing audio from&hellip;" or "Waiting for&hellip;"). <code>distinctUntilChanged</code> means it only updates when something relevant changes, not 4 times a second.</p>
+@@AT private fun startInForeground@@
+<p>Goes foreground with type <code>MEDIA_PLAYBACK</code> on Android 10+, which also needs the matching manifest permission on Android 14+.</p>
+@@AT override fun onDestroy@@
+<p>Cancels the observer.</p>
+@@AT private fun buildNotification@@
+<p>A low-importance notification with the transport category, a <b>Disconnect</b> button, and the app icon in the status bar. <code>setOnlyAlertOnce</code> keeps text updates silent.</p>
+@@AT companion object@@
+<p>The action and IDs (kept distinct from the hosting service's, so both can run at once).</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/androidMain/kotlin/com/example/streamaudio/MainActivity.kt | MainActivity.kt: Android entry point &amp; permissions@@
+@@AT class MainActivity@@
+<p>The single activity. <code>onHostPermissionGranted</code> holds what to do once every permission step succeeds (start hosting).</p>
+@@AT private val projectionLauncher@@
+<p>The result of the system's "start recording or casting?" dialog. On OK, the consent is stored and hosting starts; otherwise the user sees a short toast.</p>
+@@AT private val runtimePermissions@@
+<p>The result of the microphone (+ notification) permission request. Android requires the microphone permission for playback capture, even though no microphone is used. If it's granted, the app moves on to the consent dialog.</p>
+@@AT override fun onCreate@@
+<p><code>enableEdgeToEdge()</code> draws the app behind the system bars. The shared context is stored, then the shared <code>App</code> is shown with two Android hooks: the hosting permission flow, and the notification permission request when Listen opens.</p>
+@@AT /** Lets the@@
+<p>On Android 13+, asks for notification permission so the listening notification and its Disconnect button are visible. Playback works either way.</p>
+@@AT private val notificationPermission@@
+<p>The launcher for that request. The result is ignored on purpose, because nothing depends on it.</p>
+@@AT private fun requestHostPermission@@
+<p>Asks only for the runtime permissions not yet granted, then shows the consent dialog.</p>
+@@AT private fun hasRecordPermission@@
+<p>Helper: is the microphone permission granted?</p>
+@@AT private fun requestProjection@@
+<p>Shows the system screen-capture consent dialog.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/androidMain/AndroidManifest.xml | AndroidManifest.xml: Android declarations@@
+@@AT <?xml@@
+<p>The XML header and the manifest root.</p>
+@@AT android.permission.INTERNET@@
+<p>Permissions:</p>
+<ul>
+<li><code>INTERNET</code>: sockets.</li>
+<li>Network/Wi&#8209;Fi state: discovery and locks.</li>
+<li><code>WAKE_LOCK</code>: wake and Wi&#8209;Fi locks.</li>
+<li><code>RECORD_AUDIO</code>: playback capture.</li>
+<li><code>POST_NOTIFICATIONS</code>: service notifications.</li>
+<li>Foreground-service permissions for both service types.</li>
+</ul>
+@@AT <application@@
+<p>The application: icons (adaptive, with a themed monochrome layer), label, and <code>Theme.StreamAudio</code>, the window theme that sets the light/dark launch background.</p>
+@@AT .AudioStreamService@@
+<p>The hosting service, declared with <code>foregroundServiceType="mediaProjection"</code> as Android requires. Not exported, so other apps can't start it.</p>
+@@AT .ListenService@@
+<p>The listening service, declared with <code>foregroundServiceType="mediaPlayback"</code>.</p>
+@@AT .MainActivity@@
+<p>The launcher activity. <code>singleTop</code> means tapping a notification reuses the running activity instead of stacking a new one.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/ServerViewModel.kt | ServerViewModel.kt: Host screen logic@@
+@@AT class ServerViewModel@@
+<p>A lifecycle <code>ViewModel</code> (survives rotation). It exposes the platform host controller's state and the local addresses list.</p>
+@@AT fun refreshAddresses@@
+<p>Looks up local IPs on a background thread, since network-interface queries can be slow.</p>
+@@AT fun start()@@
+<p>Refreshes the addresses, then starts or stops hosting.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/ClientViewModel.kt | ClientViewModel.kt: Listen screen logic@@
+@@AT class ClientViewModel@@
+<p>Uses the shared receiver and exposes its state.</p>
+@@AT private val _hosts@@
+<p>Discovered hosts, and whether a scan is in progress (for the spinner).</p>
+@@AT private val _latencyMode@@
+<p>The latency mode, restored from settings (default Balanced), and the last host IP, which pre-fills the address field.</p>
+@@AT init {@@
+<p>Applies the saved mode to the receiver.</p>
+@@AT fun scan()@@
+<p>Runs discovery (about 1.5&nbsp;s) on the IO dispatcher and publishes the result. A second tap during a scan is ignored.</p>
+@@AT fun connect(@@
+<p>Saves the IP, starts the receiver, and calls the platform hook (which starts <code>ListenService</code> on Android).</p>
+@@AT fun disconnect()@@
+<p>Disconnect and latency-mode changes. Mode changes apply live, because the playback thread reads the mode on every iteration. There's intentionally no <code>onCleared()</code> stop, so playback outlives the UI.</p>
+@@AT private companion object@@
+<p>Settings keys.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/App.kt | App.kt: root UI &amp; navigation@@
+@@AT enum class Screen@@
+<p>The three screens.</p>
+@@AT /**@@
+<p><code>App</code> is the root composable used on both platforms; Android passes its permission hooks in.</p>
+@@AT var themeMode by remember@@
+<p>The theme mode is loaded from settings. The ViewModels are obtained with <code>viewModel { }</code>, which keeps them across rotation. The current screen uses <code>rememberSaveable</code>, so it also survives rotation.</p>
+@@AT StreamAudioTheme(themeMode)@@
+<p>Applies the theme and animates between screens: slide forward when going deeper, backward when returning Home.</p>
+@@AT Screen.Home -> HomeScreen(@@
+<p>Home: theme changes are saved. Opening Listen first triggers the notification permission request on Android.</p>
+@@AT Screen.Host -> HostScreen(@@
+<p>Host: <code>onStart</code> runs the Android permission flow first if there is one, otherwise starts directly. The Listen screen follows.</p>
+@@AT private const val KEY_THEME@@
+<p>The settings key for the theme.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/ui/Theme.kt | ui/Theme.kt: light &amp; dark themes@@
+@@AT enum class ThemeMode@@
+<p>The three choices of the theme switch.</p>
+@@AT private val LightColors@@
+<p>The light colour scheme: indigo primary, teal tertiary (used for "live" and listening), and tinted neutral surfaces. Each colour has an "on" partner with enough contrast to read text on it.</p>
+@@AT private val DarkColors@@
+<p>The dark scheme: lighter, desaturated accents on near-black surfaces, the Material&nbsp;3 approach to avoiding glare. The <code>surfaceContainer*</code> steps give cards depth without shadows.</p>
+@@AT private val AppTypography@@
+<p>Material typography with semi-bold headings.</p>
+@@AT @Composable@@
+<p>Resolves System/Light/Dark to "dark or not". <code>isSystemInDarkTheme()</code> follows the OS setting. It updates the Android system bars and provides the colours to every screen.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/SystemBars.kt | SystemBars.kt: system bar contract@@
+@@AT /** Makes status@@
+<p>An expect composable, implemented per platform.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/androidMain/kotlin/com/example/streamaudio/SystemBars.android.kt | SystemBars.android.kt@@
+@@AT @Composable@@
+<p>After each composition, sets the status/navigation bar icons dark on a light theme and light on a dark one. Without this, a user choosing Dark while the phone is in light mode would get invisible status-bar icons.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/jvmMain/kotlin/com/example/streamaudio/SystemBars.jvm.kt | SystemBars.jvm.kt@@
+@@AT @Composable@@
+<p>Desktop windows have no system bars to style.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/ui/Components.kt | ui/Components.kt: reusable UI pieces@@
+@@AT fun PageScaffold(@@
+<p><code>PageScaffold</code>: a top bar (optional back button and actions) and a scrolling content column, at most 560&nbsp;dp wide and centred, so desktop windows don't stretch lines across the screen.</p>
+@@AT fun Beacon(@@
+<p><code>Beacon</code>: the large round icon. While active, two rings expand and fade on a loop (drawn on a <code>Canvas</code>, staggered by half a cycle) and the circle "breathes" in scale. When inactive it is a muted grey.</p>
+@@AT fun LevelBars(@@
+<p><code>LevelBars</code>: a level meter driven by the <i>real</i> audio peak. The level is smoothed with a quick animation and square-rooted so quiet music still moves visibly. Each bar wobbles with its own sine phase so the meter looks lively. A faint track is drawn behind each bar.</p>
+@@AT fun StatTile(@@
+<p><code>StatTile</code>: icon, value and label, truncated with "&hellip;" if long.</p>
+@@AT fun StatusPill(@@
+<p><code>StatusPill</code>: a coloured capsule with a blinking dot ("LIVE", "Playing").</p>
+@@AT fun SectionTitle(@@
+<p><code>SectionTitle</code>: a small primary-coloured heading with optional trailing content (refresh button or spinner).</p>
+@@AT fun NoticeCard(@@
+<p><code>NoticeCard</code>: an error or info message card using the theme's error or secondary container colours, so it reads well in both themes.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/ui/HomeScreen.kt | ui/HomeScreen.kt@@
+@@AT fun HomeScreen(@@
+<p>The Home screen: app bar with the theme switch, a headline and an explanation.</p>
+@@AT val unsupported = hostingUnsupportedReason@@
+<p>Two mode cards: <b>Host</b> (primary colours; disabled with a reason on Android below 10) and <b>Listen</b> (tertiary colours), plus a Wi&#8209;Fi hint.</p>
+@@AT fun ModeCard(@@
+<p><code>ModeCard</code>: a large tappable card with an accent icon tile, a title, a subtitle and a chevron. When disabled it is dimmed and not clickable.</p>
+@@AT fun ThemeToggle(@@
+<p><code>ThemeToggle</code>: cycles System &rarr; Light &rarr; Dark with a matching icon and an accessible description.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/ui/HostScreen.kt | ui/HostScreen.kt@@
+@@AT @Composable@@
+<p>Collects host state and addresses as Compose state.</p>
+@@AT // Start automatically@@
+<p>Starts hosting automatically on first entry only. <code>rememberSaveable</code> stops a rotation from restarting it after the user pressed Stop.</p>
+@@AT val live =@@
+<p>Back stops sharing. The beacon pulses while live, and the status pill reflects the four states.</p>
+@@AT LevelBars(level@@
+<p>The live capture meter. While live but silent, a hint suggests playing something.</p>
+@@AT state.message?.let@@
+<p>An error card if needed, and tiles for listeners, source and quality.</p>
+@@AT SectionTitle("How to connect")@@
+<p>Connection instructions with each local IP in large monospace text and its adapter name, or a warning if the device has no network.</p>
+@@AT Spacer(Modifier.height(28.dp))@@
+<p>The main button: "Stop sharing" (error colours, with a spinner while starting) or "Start sharing" / "Try again".</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/commonMain/kotlin/com/example/streamaudio/ui/ListenScreen.kt | ui/ListenScreen.kt@@
+@@AT fun ListenScreen(@@
+<p>The Listen screen cross-fades between the connect panel and the now-playing view based on whether a session is active. The latency selector is shown on both.</p>
+@@AT fun ConnectPanel(@@
+<p><code>ConnectPanel</code>:</p>
+<ul>
+<li>Scans automatically when shown.</li>
+<li>Shows the last error.</li>
+<li>Lists discovered hosts (or an empty state with advice), with a refresh button that turns into a spinner while scanning.</li>
+<li>Has a manual IP field (whitespace stripped, keyboard Go connects) with a Connect button.</li>
+</ul>
+@@AT fun HostRow(@@
+<p><code>HostRow</code>: one discovered host, with a phone or computer icon, the name and IP. Tapping it connects.</p>
+@@AT fun NowPlaying(@@
+<p><code>NowPlaying</code>: the beacon (pulses while playing), a status pill, the host IP and a reassurance message when waiting, then the level meter, Delay and Packet-loss tiles, and Disconnect.</p>
+@@AT fun LatencySelector(@@
+<p><code>LatencySelector</code>: a three-segment button (Low / Balanced / Stable) with an explanation of the selected mode.</p>
+@@AT private fun formatLoss@@
+<p>Formats packet loss with one decimal place; tiny values show as 0%.</p>
+@@ENDFILE@@
+
+@@FILE composeApp/src/jvmMain/kotlin/com/example/streamaudio/main.kt | main.kt: desktop entry point@@
+@@AT fun main()@@
+<p>The desktop app: a 480&times;820 window with the StreamAudio icon (from <code>composeResources/drawable/app_icon.xml</code>, which is also used to generate the Android legacy launcher PNGs) and a minimum size, showing the shared <code>App()</code>.</p>
+@@ENDFILE@@
+
+<p style="margin-top:48px;color:var(--muted);font-size:14px">Generated from the source by <code>docs/tools/build-guide.pl</code>. After changing code, run <code>perl docs/tools/build-guide.pl</code> from the repository root to refresh this page.</p>
+</main>
+</div>
+<script>
+(function () {
+  var btn = document.getElementById('themeBtn');
+  var modes = ['auto', 'light', 'dark'];
+  var mode = 'auto';
+  try { mode = localStorage.getItem('sa-guide-theme') || 'auto'; } catch (e) {}
+  function apply() {
+    if (mode === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', mode);
+    btn.textContent = 'Theme: ' + mode;
+  }
+  btn.addEventListener('click', function () {
+    mode = modes[(modes.indexOf(mode) + 1) % modes.length];
+    try { localStorage.setItem('sa-guide-theme', mode); } catch (e) {}
+    apply();
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

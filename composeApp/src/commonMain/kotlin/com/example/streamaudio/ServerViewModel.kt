@@ -1,49 +1,33 @@
 package com.example.streamaudio
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-class ServerViewModel {
-    private val streamer = AudioStreamer()
-    private val _isStreaming = MutableStateFlow(false)
-    val isStreaming = _isStreaming.asStateFlow()
+class ServerViewModel : ViewModel() {
+    private val controller = createHostController()
+    val state: StateFlow<HostState> = controller.state
 
-    private val _serverIp = MutableStateFlow("Loading IP...")
-    val serverIp = _serverIp.asStateFlow()
+    private val _addresses = MutableStateFlow<List<LocalAddress>>(emptyList())
+    val addresses: StateFlow<List<LocalAddress>> = _addresses.asStateFlow()
 
-    private val _statusMessage = MutableStateFlow("Ready to Host")
-    val statusMessage = _statusMessage.asStateFlow()
+    val port = StreamConfig.DEFAULT_PORT
 
-    init {
-        _serverIp.value = streamer.getServerIp()
-    }
-
-    fun toggleStreaming() {
-        if (_isStreaming.value) {
-            stopServer()
-        } else {
-            startServer()
+    fun refreshAddresses() {
+        viewModelScope.launch {
+            _addresses.value = withContext(Dispatchers.IO) { HostDiscovery.localAddresses() }
         }
     }
 
-    private fun startServer() {
-        try {
-            val port = 50005
-            streamer.startStreaming(port)
-            _isStreaming.value = true
-            _statusMessage.value = "Streaming on Port $port"
-        } catch (e: Exception) {
-            _statusMessage.value = "Error: ${e.message}"
-            _isStreaming.value = false
-        }
+    fun start() {
+        refreshAddresses()
+        controller.start()
     }
 
-    private fun stopServer() {
-        streamer.stopStreaming()
-        _isStreaming.value = false
-        _statusMessage.value = "Server Stopped"
-    }
+    fun stop() = controller.stop()
 }

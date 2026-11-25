@@ -10,6 +10,11 @@ plugins {
 }
 
 kotlin {
+    compilerOptions {
+        // expect/actual classes (AudioPlayer, AppSettings) are stable enough for this app.
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     androidTarget {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)

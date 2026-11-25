@@ -1,23 +1,34 @@
 package com.example.streamaudio
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
-
+/** Process-wide Android state shared between the activity, the service and common code. */
+@SuppressLint("StaticFieldLeak") // Only ever holds the application context.
 object AndroidPermissionHelper {
-    var permissionIntent : Intent? = null
-    var permissionResultCode: Int = 0
-    var context : Context? = null
+    lateinit var context: Context
+        private set
 
-    private val _hasPermission = MutableStateFlow(false)
-    val hasPermission = _hasPermission.asStateFlow()
+    fun init(appContext: Context) {
+        context = appContext.applicationContext
+    }
 
-    // Update function to take BOTH intent and code
-    fun setPermission(intent: Intent?, resultCode: Int){
-        permissionIntent = intent
-        permissionResultCode = resultCode
-        _hasPermission.value = (permissionIntent != null)
+    /** The screen-capture consent. Single use: Android 14+ rejects a reused token. */
+    private var projectionData: Intent? = null
+    private var projectionResultCode: Int = 0
+
+    fun setProjectionPermission(data: Intent, resultCode: Int) {
+        projectionData = data
+        projectionResultCode = resultCode
+    }
+
+    fun hasProjectionPermission() = projectionData != null
+
+    /** Hands out the consent exactly once. */
+    fun consumeProjectionPermission(): Pair<Int, Intent>? {
+        val data = projectionData ?: return null
+        projectionData = null
+        return projectionResultCode to data
     }
 }
