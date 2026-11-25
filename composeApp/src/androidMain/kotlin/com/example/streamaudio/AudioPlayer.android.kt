@@ -3,23 +3,24 @@ package com.example.streamaudio
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.os.Build
 
 actual class AudioPlayer actual constructor() {
 
-    private var audioTrack: AudioTrack? = null
-    private var isPlaying = false
+    private var track: AudioTrack? = null
 
-    actual fun startAudio() {
-        if (isPlaying) return
+    actual val outputLatencyMs: Int
+        get() = track?.let { it.bufferSizeInFrames * 1000 / StreamConfig.SAMPLE_RATE } ?: 0
 
-        val sampleRate = 48000
-        val channelConfig = AudioFormat.CHANNEL_OUT_STEREO
-        val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+    actual fun start() {
+        if (track != null) return
+        val channelMask = AudioFormat.CHANNEL_OUT_STEREO
+        val encoding = AudioFormat.ENCODING_PCM_16BIT
+        val minBuffer = AudioTrack.getMinBufferSize(StreamConfig.SAMPLE_RATE, channelMask, encoding)
+        // Small device buffer; the receiver's jitter queue absorbs network timing instead.
+        val bufferBytes = maxOf(minBuffer, StreamConfig.PACKET_BYTES * 4)
 
-        val minBufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat)
-        val bufferSize = maxOf(minBufferSize, 4096)
-
-        audioTrack = AudioTrack.Builder()
+        val builder = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -28,32 +29,33 @@ actual class AudioPlayer actual constructor() {
             )
             .setAudioFormat(
                 AudioFormat.Builder()
-                    .setEncoding(audioFormat)
-                    .setSampleRate(sampleRate)
-                    .setChannelMask(channelConfig)
+                    .setEncoding(encoding)
+                    .setSampleRate(StreamConfig.SAMPLE_RATE)
+                    .setChannelMask(channelMask)
                     .build()
             )
             .setTransferMode(AudioTrack.MODE_STREAM)
-            .setBufferSizeInBytes(bufferSize)
-            .build()
+            .setBufferSizeInBytes(bufferBytes)
 
-        audioTrack?.play()
-        isPlaying = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Requests the "fast" mixer path: noticeably less output delay on most phones.
+            builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+        }
+
+        track = builder.build().also {
+            check(it.state == AudioTrack.STATE_INITIALIZED) { "Couldn't open the speaker" }
+            it.play()
+        }
     }
 
-    actual fun playAudio(data: ByteArray, size: Int) {
-        if (!isPlaying) return
-        audioTrack?.write(data, 0, size)
+    actual fun write(data: ByteArray, offset: Int, length: Int) {
+        track?.write(data, offset, length)
     }
 
     actual fun stop() {
-        isPlaying = false
-        try {
-            audioTrack?.stop()
-            audioTrack?.release()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        audioTrack = null
+        val t = track ?: return
+        track = null
+        runCatching { t.pause(); t.flush(); t.stop() }
+        t.release()
     }
 }
